@@ -74,38 +74,44 @@ fun DemoGlassPage(
         CAMPUS_ITEMS.indexOfFirst { it.id == selectedPageId }.coerceAtLeast(0)
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .layerBackdrop(backdrop)
-    ) {
-        Column(
+    Box(Modifier.fillMaxSize()) {
+        // 录制范围：只有页面内容（KSU 中即 pagerContent，L388）
+        Box(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .layerBackdrop(backdrop)
         ) {
-            Spacer(Modifier.height(WindowInsets.systemBars.asPaddingValues().calculateTopPadding() + 48.dp))
-            Text(
-                "校园服务",
-                Modifier.padding(horizontal = 28.dp),
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF16324F),
-            )
-            Text(
-                "液态玻璃 · 演示模式",
-                Modifier.padding(horizontal = 28.dp, vertical = 6.dp),
-                fontSize = 15.sp,
-                color = Color(0xFF6B7A90),
-            )
-            Spacer(Modifier.height(24.dp))
-            repeat(6) { i ->
-                DemoCard(i)
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Spacer(Modifier.height(WindowInsets.systemBars.asPaddingValues().calculateTopPadding() + 48.dp))
+                Text(
+                    "校园服务",
+                    Modifier.padding(horizontal = 28.dp),
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF16324F),
+                )
+                Text(
+                    "液态玻璃 · 演示模式",
+                    Modifier.padding(horizontal = 28.dp, vertical = 6.dp),
+                    fontSize = 15.sp,
+                    color = Color(0xFF6B7A90),
+                )
+                Spacer(Modifier.height(24.dp))
+                repeat(6) { i ->
+                    DemoCard(i)
+                }
+                Spacer(Modifier.height(180.dp)) // 给浮动底栏留空间
             }
-            Spacer(Modifier.height(180.dp)) // 给浮动底栏留空间
         }
 
         // ==== KSU BottomBarMiuix 浮动底栏，逐行对齐 ====
+        // 关键：底栏必须在 layerBackdrop 录制范围外（KSU 中位于 Scaffold bottomBar 槽，
+        // 不在 pagerContent 内）。底栏消费 backdrop 却在录制范围内 = 自己录自己，
+        // RenderNode 成环 → RenderThread prepareTreeImpl 无限递归 SIGSEGV。
         val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             .let { inset -> if (inset != 0.dp) 8.dp + inset else 28.dp }
         FloatingBottomBar(
