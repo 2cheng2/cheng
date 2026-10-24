@@ -42,17 +42,17 @@ fun AboutDialog(
                 Text(
                     "开发投入  16 小时",
                     fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF6B7A90),
                 )
                 Text(
                     "版本  v$versionName",
                     fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF6B7A90),
                 )
                 Text(
                     "\n底栏效果来自 KernelSU / miuix 项目 (Apache 2.0)",
                     fontSize = 11.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF6B7A90),
                 )
             }
         },
