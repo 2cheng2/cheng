@@ -1,34 +1,28 @@
 package GJJX.zzzwt.ltd.compose
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * 底栏图标 —— 自绘矢量（24dp 网格），填充式，单色（跟随 LocalContentColor）。
+ * 底栏图标 —— 自绘矢量（24dp 网格），填充式，单色（跟随 tint）。
+ * 注意：ImageVector.Builder 一次性使用，每个图标必须新建 builder。
  */
+private fun iconBuilder(name: String) = ImageVector.Builder(
+    name = name,
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+)
+
 object CampusIcons {
 
-    private val base = ImageVector.Builder(
-        name = "CampusIcon",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
-    )
-
     /** 首页：小房子 */
-    val Home: ImageVector = base.apply {
-        path(
-            fill = SolidColor(Color.Black),
-            fillAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
-        ) {
+    val Home: ImageVector = iconBuilder("Home").apply {
+        path(fill = SolidColor(Color.Black)) {
             moveTo(12f, 3f)
             lineTo(21f, 10f)
             lineTo(21f, 21f)
@@ -42,11 +36,9 @@ object CampusIcons {
         }
     }.build()
 
-    /** 助手：四角星（魔法闪光） */
-    val Tools: ImageVector = base.apply {
-        path(
-            fill = SolidColor(Color.Black),
-        ) {
+    /** 助手：四角星 */
+    val Tools: ImageVector = iconBuilder("Tools").apply {
+        path(fill = SolidColor(Color.Black)) {
             moveTo(12f, 2f)
             lineTo(14.2f, 9.2f)
             lineTo(21.5f, 12f)
@@ -59,12 +51,9 @@ object CampusIcons {
         }
     }.build()
 
-    /** 论坛：对话气泡 */
-    val Forum: ImageVector = base.apply {
-        path(
-            fill = SolidColor(Color.Black),
-        ) {
-            // 主气泡
+    /** 论坛：双气泡 */
+    val Forum: ImageVector = iconBuilder("Forum").apply {
+        path(fill = SolidColor(Color.Black)) {
             moveTo(3f, 4f)
             lineTo(17f, 4f)
             lineTo(17f, 13f)
@@ -73,7 +62,6 @@ object CampusIcons {
             lineTo(5f, 13f)
             lineTo(3f, 13f)
             close()
-            // 次气泡
             moveTo(19f, 8f)
             lineTo(21f, 8f)
             lineTo(21f, 20f)
@@ -85,26 +73,20 @@ object CampusIcons {
         }
     }.build()
 
-    /** 相册：照片框（山+太阳） */
-    val Gallery: ImageVector = base.apply {
-        path(
-            fill = SolidColor(Color.Black),
-        ) {
+    /** 相册：外框镂空 + 山与太阳 */
+    val Gallery: ImageVector = iconBuilder("Gallery").apply {
+        path(fill = SolidColor(Color.Black)) {
+            // 外框：外矩形顺时针 + 内矩形逆时针（evenodd 镂空）
             moveTo(3f, 5f)
             lineTo(21f, 5f)
             lineTo(21f, 19f)
             lineTo(3f, 19f)
             close()
             moveTo(5f, 7f)
-            lineTo(5f, 17f)
-            lineTo(19f, 17f)
             lineTo(19f, 7f)
+            lineTo(19f, 17f)
+            lineTo(5f, 17f)
             close()
-        }
-        // 山与太阳用描边层补充（fill 画框，这里画内容）
-        path(
-            fill = SolidColor(Color.Black),
-        ) {
             // 太阳
             moveTo(15.5f, 8.5f)
             curveTo(15.5f, 9.33f, 14.83f, 10f, 14f, 10f)
@@ -118,16 +100,13 @@ object CampusIcons {
             lineTo(11.8f, 14f)
             lineTo(13.8f, 11.5f)
             lineTo(17.5f, 15.5f)
-            lineTo(8f, 15.5f)
             close()
         }
     }.build()
 
-    /** 数据：柱状图 */
-    val Scores: ImageVector = base.apply {
-        path(
-            fill = SolidColor(Color.Black),
-        ) {
+    /** 数据：三柱状图 */
+    val Scores: ImageVector = iconBuilder("Scores").apply {
+        path(fill = SolidColor(Color.Black)) {
             moveTo(5f, 20f)
             lineTo(5f, 10f)
             lineTo(8f, 10f)
