@@ -23,6 +23,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 冷启动计数（About 每 4 次冷启动可弹一次的闸门）
+        if (savedInstanceState == null) {
+            LaunchGate.onNewLaunch(this)
+        }
         enableEdgeToEdge()
         setContent {
             CampusGlassHost(
