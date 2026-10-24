@@ -1,7 +1,7 @@
 package GJJX.zzzwt.ltd;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
@@ -49,7 +49,7 @@ import java.util.Map;
  *
  * 3. 站点自带顶部导航，应用不加底栏，保持与浏览器一致的交互。
  */
-public class MainActivity extends Activity {
+public class MainActivity extends ComponentActivity {
 
     /** 本地资源安全源。以 .androidplatform.net 结尾，由本应用独占解析。 */
     private static final String ASSET_HOST = "appassets.androidplatform.net";
