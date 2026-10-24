@@ -118,17 +118,25 @@ class MainActivity : ComponentActivity() {
         /**
          * 布局修正脚本。
          *
-         * 站点原始布局：body{height:100vh / 100dvh} + display:flex，
-         * .page-view{flex:1; overflow-y:auto}。
-         * 这套"视口定高 + 内层滚动"在 WebView 里 100dvh 解析不可靠，
-         * body 高度算成 0 → .page-view 塌成 144px（只有一小条能滚）。
+         * 站点原始布局（网页版，非 app-mode）：
+         *   body { height: 100vh; display: flex; flex-direction: column; }
+         *   .header { position: fixed; height: 64px; }
+         *   .page-view { flex: 1; overflow-y: auto; padding-top: 64px; }
+         *   .app-bottom-nav { display: none; }   // 非 app-mode 下本来就不显示
          *
-         * 修正思路：彻底放弃"定高 + 内层滚动"，改回最朴素的文档自然流：
-         *   - html/body 高度 auto，去掉 flex 与 overflow 限制
-         *   - .page-view 不再当滚动容器（height auto、overflow visible）
-         *   - 整页由 WebView 原生滚动承载
-         * 这样内容会自然撑开文档、WebView 天然支持上下滚动，
-         * 也不会出现"只显示一屏"或"翻不动"。
+         * 问题：手机端媒体查询把 body 改成 height: 100dvh !important。
+         * WebView 对 dvh 支持不可靠 → body 高度算成 0 →
+         * flex:1 的 .page-view 塌成 144px，只有一小条能滚。
+         *
+         * 修正（保持站点原设计，只补两处）：
+         *   1. html/body 用 height:100%（WebView 中 html 高度 = 视口，可靠），
+         *      替掉不可靠的 dvh；保留 flex 纵向布局。
+         *   2. .page-view 加 min-height:0 —— flex 子项能正确收缩并滚动的必要条件，
+         *      缺了它内容会把容器撑开、overflow-y:auto 失效。
+         *   3. 底部留白，避免内容被原生玻璃底栏遮住。
+         *
+         * 不注入 app-mode：保持站点网页版界面（站点头部导航可见），
+         * 站点自己的 .app-bottom-nav 在非 app-mode 下是 display:none，自然不显示。
          */
         private val FIX_LAYOUT_JS = """
             (function(){
@@ -139,22 +147,17 @@ class MainActivity : ComponentActivity() {
                 document.head.appendChild(s);
               }
               s.textContent = [
-                /* 1. 解除视口定高，恢复文档自然流 */
-                'html, body { height: auto !important; min-height: 100% !important; overflow: visible !important; }',
-                'body { display: block !important; flex-direction: unset !important; }',
-                /* 2. .page-view 不再充当滚动容器，让内容撑开文档 */
-                '.page-view { height: auto !important; flex: none !important; overflow: visible !important; }',
-                '.page-view.active { display: block !important; }',
-                /* 3. 给原生玻璃底栏留出空间（站点 app-mode 自带 70px，再加厚一点） */
-                '.page-view.active { padding-bottom: 100px !important; }'
+                /* 1. 用百分比高度替代 dvh（body 选择器 + 媒体查询同款，靠 id 样式表后加载取胜） */
+                'html { height: 100% !important; }',
+                'html body, body { height: 100% !important; min-height: 0 !important; display: flex !important; flex-direction: column !important; overflow: hidden !important; }',
+                /* 2. flex 子项允许收缩 + 内层滚动（关键：min-height:0） */
+                'html body .page-view, .page-view { flex: 1 1 auto !important; min-height: 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }',
+                'html body .page-view.active, .page-view.active { display: block !important; padding-bottom: 96px !important; }',
+                /* 3. 站点自己的底部导航不显示（双保险，非 app-mode 下本已 display:none） */
+                'html body .app-bottom-nav, .app-bottom-nav { display: none !important; }'
               ].join('\n');
 
-              // 开启站点自带的 app-mode：隐藏站点自己的 header / 底部导航
-              // （我们用的是原生液态玻璃底栏）
-              document.body.classList.add('app-mode');
-
               // 滚回顶部，避免残留滚动位置
-              window.scrollTo(0, 0);
               var av = document.querySelector('.page-view.active');
               if (av) av.scrollTop = 0;
             })();
