@@ -55,7 +55,14 @@ fun CampusGlassHost(
             drawContent()
         }
 
-        Box(modifier.layerBackdrop(backdrop)) {
+        // 注意：本 Box 内含 AndroidView(webView)，绝不能对它挂 layerBackdrop。
+        // KSU 本尊（MainActivity.kt L388/L396）的 backdrop 只录制纯 Compose 内容
+        // （HorizontalPager），其 App 中不存在 View interop。GraphicsLayer.record
+        // 绘制 WebView 的 ViewLayer 会令渲染树成环，RenderThread 在
+        // prepareTreeImpl 无限递归栈溢出（实测 SIGSEGV，启动 ~10s WebView
+        // 首帧上屏触发录制时崩溃）。
+        // 因此底栏走 KSU 的 blur 不可用降级路径（isBlurEnabled=false → 纯色）。
+        Box(modifier) {
             Box(Modifier.fillMaxSize()) {
                 AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
             }
@@ -64,7 +71,7 @@ fun CampusGlassHost(
                 selectedPageId = selectedPageId,
                 onPageSelected = onPageSelected,
                 backdrop = backdrop,
-                blurEnabled = blurEnabled,
+                blurEnabled = false,
                 onLongPress = { showAbout = true },
             )
 
