@@ -197,11 +197,13 @@ public class MainActivity extends ComponentActivity {
         webView = new WebView(this);
 
         /* 硬件加速策略。
-           实测结论：Android WebView 里 backdrop-filter 默认不生效
-           （同一台设备的 Chrome 正常，说明是 WebView 的合成路径限制）。
-           这里显式开启硬件加速，并配合 CSS 侧的层提升，
-           尽可能让 Chromium 走"有背景纹理"的合成分支。 */
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+           注意：绝不能给 WebView 设 LAYER_TYPE_HARDWARE。
+           显式硬件层会创建 ViewLayer，而 miuix-blur 的 layerBackdrop
+           录制子树（GraphicsLayer.record）会把后代 ViewLayer 的
+           RenderNode 挂进录制树，与 WebView 自身节点成环，
+           RenderThread 在 prepareTreeImpl 无限递归直至栈溢出（SIGSEGV）。
+           WebView 默认即硬件加速，无需额外图层。 */
+        webView.setLayerType(View.LAYER_TYPE_NONE, null);
 
         webView.setBackgroundColor(Color.TRANSPARENT);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
