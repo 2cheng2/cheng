@@ -58,7 +58,9 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView {
         val wv = WebView(this)
-        wv.setBackgroundColor(Color.TRANSPARENT)
+        // 不透明白底：透明 WebView 在硬件渲染下只绘制初始视口，
+        // 下方区域是未绘制瓦片（表现为"只有上半截有内容"）
+        wv.setBackgroundColor(Color.WHITE)
         wv.setOverScrollMode(View.OVER_SCROLL_NEVER)
         wv.setLayerType(View.LAYER_TYPE_NONE, null) // 见类注释 2
 
