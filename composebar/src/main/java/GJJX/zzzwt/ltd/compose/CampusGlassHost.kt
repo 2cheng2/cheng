@@ -2,12 +2,17 @@ package GJJX.zzzwt.ltd.compose
 
 import android.webkit.WebView
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +48,8 @@ fun CampusGlassHost(
         val dark = isSystemInDarkTheme()
         val surface = if (dark) Color(0xFF1E293B) else Color(0xFFFCFCFD)
 
+        var showAbout by remember { mutableStateOf(false) }
+
         val backdrop = rememberLayerBackdrop {
             drawRect(surface)
             drawContent()
@@ -58,7 +65,12 @@ fun CampusGlassHost(
                 onPageSelected = onPageSelected,
                 backdrop = backdrop,
                 blurEnabled = blurEnabled,
+                onLongPress = { showAbout = true },
             )
+
+            if (showAbout) {
+                AboutDialog(onDismiss = { showAbout = false })
+            }
         }
     }
 }
@@ -69,6 +81,7 @@ fun CampusBottomBar(
     onPageSelected: (String) -> Unit,
     backdrop: Backdrop,
     blurEnabled: Boolean,
+    onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val selectedIndex = remember(selectedPageId) {
@@ -89,7 +102,10 @@ fun CampusBottomBar(
             val color = if (active) MiuixTheme.colorScheme.primary
                         else MiuixTheme.colorScheme.onSurface
             Box(
-                modifier = Modifier.fillMaxHeight().weight(1f),
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .combinedClickable(onClick = {}, onLongClick = onLongPress),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(item.label, color = color, style = MiuixTheme.textStyles.main)

@@ -56,3 +56,9 @@ html,body{
   .r2{border-color:#FFD9BC}
   .bar i{transition-duration:.01s}
 }
+
+/* 版本署名行 */
+.v{
+  font-size:10px;font-weight:300;letter-spacing:.14em;color:#D8C4B4;
+  text-indent:.14em;margin-top:-18px;
+}
