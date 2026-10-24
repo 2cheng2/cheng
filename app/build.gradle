@@ -1,0 +1,30 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'GJJX.zzzwt.ltd'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId 'GJJX.zzzwt.ltd'
+        minSdk 28
+        targetSdk 34
+        versionCode 100002
+        versionName '1.0.2'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/*.kotlin_module']
+        }
+    }
+}
+
+dependencies {
+    implementation project(':composebar')
+}
