@@ -72,6 +72,10 @@ class MainActivity : ComponentActivity() {
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             userAgentString = userAgentString?.replace("; wv", "")?.replace(" Version/4.0", "")
+            // 关键：useWideViewPort 必须配合 setLoadWithOverviewMode，
+            // 且站点 meta viewport 需要生效。若站点 meta 缺失/异常，
+            // 强制文本缩放与初始缩放对齐物理屏。
+            textZoom = 100
         }
 
         // 诊断探针：页面加载完打印 Chromium 内部视口信息
@@ -84,11 +88,21 @@ class MainActivity : ComponentActivity() {
         wv.webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
                 view.evaluateJavascript(
-                    """(function(){var d=document.documentElement;
-                    return JSON.stringify({iw:innerWidth,ih:innerHeight,
-                    dsh:d.scrollHeight,bch:document.body.clientHeight,
-                    dpr:devicePixelRatio,scale:visualViewport?visualViewport.scale:null});})()""",
-                ) { v -> android.util.Log.w("WVPROBE", "probe: $v") }
+                    """(function(){
+                    var out=[];
+                    document.querySelectorAll('*').forEach(function(e){
+                      var s=getComputedStyle(e);
+                      if((s.overflowY==='auto'||s.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+10){
+                        out.push(e.tagName+'.'+(e.className&&e.className.toString().slice(0,40))+' ch='+e.clientHeight+' sh='+e.scrollHeight);
+                      }
+                    });
+                    var kids=Array.from(document.body.children).slice(0,10).map(function(e){
+                      var r=e.getBoundingClientRect();
+                      return e.tagName+'.'+(e.className&&e.className.toString().slice(0,40))+' top='+Math.round(r.top)+' h='+Math.round(r.height);
+                    });
+                    return JSON.stringify({bodyCH:document.body.clientHeight,bodySH:document.body.scrollHeight,kids:kids,scrollers:out.slice(0,8)});
+                    })()""",
+                ) { v -> android.util.Log.w("WVPROBE", "deep: $v") }
             }
         }
         return wv
