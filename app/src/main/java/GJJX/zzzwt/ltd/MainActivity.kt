@@ -73,6 +73,10 @@ class MainActivity : ComponentActivity() {
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             userAgentString = userAgentString?.replace("; wv", "")?.replace(" Version/4.0", "")
             textZoom = 100
+            // 允许文档级滚动（某些站点 CSS 会禁用，这里不退让）
+            setSupportZoom(false)
+            builtInZoomControls = false
+            displayZoomControls = false
         }
 
         wv.webViewClient = object : android.webkit.WebViewClient() {
@@ -114,19 +118,20 @@ class MainActivity : ComponentActivity() {
         /**
          * 布局修正脚本。
          *
-         * 站点问题：body{height:100vh} 在 @media(max-width:767px) 里被改成
-         * height:100dvh !important。WebView 的 100dvh 解析不可靠，导致
-         * body 实际高度 0 → flex:1 的 .page-view 塌陷成 144px。
+         * 站点原始布局：body{height:100vh / 100dvh} + display:flex，
+         * .page-view{flex:1; overflow-y:auto}。
+         * 这套"视口定高 + 内层滚动"在 WebView 里 100dvh 解析不可靠，
+         * body 高度算成 0 → .page-view 塌成 144px（只有一小条能滚）。
          *
-         * 修正：
-         *   1. 用像素高度钉死 body（由 JS 读真实 innerHeight，不依赖 dvh）。
-         *   2. 开启站点自带的 app-mode（隐藏站点 header 与站点自己的底栏，
-         *      因为我们用的是原生玻璃底栏）。
-         *   3. .page-view 显式高度兜底。
+         * 修正思路：彻底放弃"定高 + 内层滚动"，改回最朴素的文档自然流：
+         *   - html/body 高度 auto，去掉 flex 与 overflow 限制
+         *   - .page-view 不再当滚动容器（height auto、overflow visible）
+         *   - 整页由 WebView 原生滚动承载
+         * 这样内容会自然撑开文档、WebView 天然支持上下滚动，
+         * 也不会出现"只显示一屏"或"翻不动"。
          */
         private val FIX_LAYOUT_JS = """
             (function(){
-              var h = window.innerHeight;
               var s = document.getElementById('zhy-fix-layout');
               if (!s) {
                 s = document.createElement('style');
@@ -134,15 +139,22 @@ class MainActivity : ComponentActivity() {
                 document.head.appendChild(s);
               }
               s.textContent = [
-                'html, body { height: ' + h + 'px !important; min-height: ' + h + 'px !important; }',
-                'body { display: flex !important; flex-direction: column !important; overflow: hidden !important; }',
-                '.page-view.active { height: auto !important; flex: 1 1 auto !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }'
+                /* 1. 解除视口定高，恢复文档自然流 */
+                'html, body { height: auto !important; min-height: 100% !important; overflow: visible !important; }',
+                'body { display: block !important; flex-direction: unset !important; }',
+                /* 2. .page-view 不再充当滚动容器，让内容撑开文档 */
+                '.page-view { height: auto !important; flex: none !important; overflow: visible !important; }',
+                '.page-view.active { display: block !important; }',
+                /* 3. 给原生玻璃底栏留出空间（站点 app-mode 自带 70px，再加厚一点） */
+                '.page-view.active { padding-bottom: 100px !important; }'
               ].join('\n');
 
-              // 开启站点自带的 app-mode：隐藏站点 header 和站点自己的底部导航
+              // 开启站点自带的 app-mode：隐藏站点自己的 header / 底部导航
+              // （我们用的是原生液态玻璃底栏）
               document.body.classList.add('app-mode');
 
-              // 让当前页滚回顶部，避免残留滚动位置
+              // 滚回顶部，避免残留滚动位置
+              window.scrollTo(0, 0);
               var av = document.querySelector('.page-view.active');
               if (av) av.scrollTop = 0;
             })();
