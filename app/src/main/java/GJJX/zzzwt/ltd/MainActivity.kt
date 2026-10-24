@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
 
         // 等 WebView 完成首次布局（尺寸>0）后再加载站点
         var loaded = false
-        wv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _ ->
+        wv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             if (!loaded && wv.width > 0 && wv.height > 0) {
                 loaded = true
                 wv.loadUrl("https://zhy2026.ltd")
