@@ -17,3 +17,4 @@ app/build/
 kotlin/
 .kotlin/
 .idea/
+fetch_latest.sh

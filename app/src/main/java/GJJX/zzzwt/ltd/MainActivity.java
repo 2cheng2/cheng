@@ -218,9 +218,10 @@ public class MainActivity extends ComponentActivity {
             } catch (Throwable ignored) {
             }
         }
-        root.addView(webView, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
+        /* WebView 不在这里 addView：
+           它会通过 Compose 的 AndroidView 进入视图树（见 setupComposeBar）。
+           同一个 View 只能有一个 parent，先加到 root 会导致
+           AndroidView 再加时抛 "child already has a parent" 崩溃。 */
 
         WebSettings s = webView.getSettings();
 
