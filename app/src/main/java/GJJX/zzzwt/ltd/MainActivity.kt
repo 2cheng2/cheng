@@ -73,6 +73,24 @@ class MainActivity : ComponentActivity() {
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             userAgentString = userAgentString?.replace("; wv", "")?.replace(" Version/4.0", "")
         }
+
+        // 诊断探针：页面加载完打印 Chromium 内部视口信息
+        wv.webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
+                android.util.Log.w("WVPROBE", "console: ${consoleMessage.message()}")
+                return true
+            }
+        }
+        wv.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String) {
+                view.evaluateJavascript(
+                    """(function(){var d=document.documentElement;
+                    return JSON.stringify({iw:innerWidth,ih:innerHeight,
+                    dsh:d.scrollHeight,bch:document.body.clientHeight,
+                    dpr:devicePixelRatio,scale:visualViewport?visualViewport.scale:null});})()""",
+                ) { v -> android.util.Log.w("WVPROBE", "probe: $v") }
+            }
+        }
         return wv
     }
 
