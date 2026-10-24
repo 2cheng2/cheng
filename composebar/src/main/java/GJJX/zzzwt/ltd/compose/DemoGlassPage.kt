@@ -76,26 +76,34 @@ fun CampusSitePage(
     }
 
     Box(Modifier.fillMaxSize()) {
-        // ==== 录制范围：页面内容 ====
+        // ==== 录制范围：只有曲线背景（纯 Compose）====
+        // 实测结论（2026-10-24）：WebView 不能进 layerBackdrop 录制范围——
+        // 每帧录制反复触发 WebView 重排（视觉抽搐）、ViewLayer 录进
+        // GraphicsLayer 尺寸错乱（页面缩成 1/20）、最终进程死亡。
+        // 因此录制范围只放纯 Compose 波浪背景，玻璃模糊的是它；
+        // WebView 叠在其上（透明背景处露出波浪），但在录制范围外。
         Box(
             Modifier
                 .fillMaxSize()
                 .layerBackdrop(backdrop)
         ) {
-            AndroidView(
-                factory = { webView },
-                modifier = Modifier.fillMaxSize(),
-                update = { wv ->
-                    // WebView 手指拖动视为"滑动"（About 闸门触发源）
-                    wv.setOnTouchListener { _, event ->
-                        if (event.action == MotionEvent.ACTION_MOVE) {
-                            onUserScroll()
-                        }
-                        false // 不消费，WebView 正常滚动
-                    }
-                },
-            )
+            WaveCanvas()
         }
+
+        // ==== WebView：录制范围外，覆盖在波浪背景上 ====
+        AndroidView(
+            factory = { webView },
+            modifier = Modifier.fillMaxSize(),
+            update = { wv ->
+                // WebView 手指拖动视为"滑动"（About 闸门触发源）
+                wv.setOnTouchListener { _, event ->
+                    if (event.action == MotionEvent.ACTION_MOVE) {
+                        onUserScroll()
+                    }
+                    false // 不消费，WebView 正常滚动
+                }
+            },
+        )
 
         // ==== KSU BottomBarMiuix 浮动底栏（必须在录制范围外！）====
         val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -148,8 +156,19 @@ fun CampusSitePage(
 }
 
 /**
+ * 曲线背景画布（纯 Compose，进 backdrop 录制范围）。
+ */
+@Composable
+private fun WaveCanvas() {
+    androidx.compose.foundation.Canvas(
+        Modifier.fillMaxSize()
+    ) {
+        drawWaveBackground()
+    }
+}
+
+/**
  * 曲线背景：三层贝塞尔波浪 + 顶部渐变 + 光斑，蓝青配色。
- * WebView 未上屏/透明区域时，玻璃模糊到的是这层。
  */
 private fun DrawScope.drawWaveBackground() {
     val w = size.width
