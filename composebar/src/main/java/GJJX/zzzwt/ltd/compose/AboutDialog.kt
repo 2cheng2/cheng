@@ -35,7 +35,7 @@ fun AboutDialog(
                     color = MiuixTheme.colorScheme.onSurface,
                 )
                 Text(
-                    "\n作者  GJXzzzh",
+                    "\n作者  GJX",
                     fontSize = 15.sp,
                     color = Color(0xFF1A5FB4),
                 )

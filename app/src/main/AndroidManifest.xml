@@ -19,8 +19,8 @@
         android:hardwareAccelerated="true"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
-        <meta-data android:name="app.author" android:value="GJXzzzh" />
-        <meta-data android:name="app.author_signature" android:value="Powered by GJXzzzh · 16h of craft" />
+        <meta-data android:name="app.author" android:value="GJX" />
+        <meta-data android:name="app.author_signature" android:value="Powered by GJX" />
 
         <activity
             android:name=".MainActivity"
