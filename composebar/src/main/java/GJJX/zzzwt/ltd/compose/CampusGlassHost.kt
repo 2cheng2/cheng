@@ -9,22 +9,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * 启动计数闸门：About 对话框每 4 次冷启动才允许弹出一次。
- * 计数持久化（SharedPreferences，每次冷启动 +1）；
- * 进程存活期间弹过一次后不再弹（不清后台不会重复显示），
- * 清后台重开进程后计数继续累计。
+ * 启动闸门（累计计数，不重置）：
+ *
+ * 规则：
+ *   - 每次打开 App（冷启动）计数 +1，持久化；
+ *   - 累计打开次数每满 4 的倍数，则本次使用期间在用户滑动时强制弹一次 About；
+ *   - 本次进程内弹过之后，无论怎么滑都不再弹；
+ *   - 只有清掉后台（进程被杀）后重新打开，才进入新一轮计数。
+ *
+ * 即：开 4 次 → 第 4 次使用中滑动时弹 1 次 → 不清后台永不再弹 →
+ *     清后台后再开 3 次（第 5、6、7 次打开）→ 第 7 次使用中滑动时再弹。
  */
 object LaunchGate {
     private const val PREFS = "zhy_gate"
     private const val KEY_COUNT = "launch_count"
 
-    /** 冷启动时调用（savedInstanceState == null） */
+    /** 冷启动时调用（savedInstanceState == null），累计 +1 */
     fun onNewLaunch(context: Context) {
         val sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         sp.edit().putInt(KEY_COUNT, sp.getInt(KEY_COUNT, 0) + 1).apply()
     }
 
-    /** 本次冷启动是否为"可弹 About"的启动（第 4、8、12… 次） */
+    /**
+     * 本次冷启动是否为"滑动可触发 About"的那次使用：
+     * 打开次数是 4 的倍数（4、8、12…）。
+     */
     fun isAboutLaunch(context: Context): Boolean {
         val c = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getInt(KEY_COUNT, 0)
@@ -34,8 +43,11 @@ object LaunchGate {
 
 /**
  * 演示宿主：管理 About 对话框状态，承载纯 Compose 玻璃演示页。
- * 无 WebView、无 AndroidView —— backdrop 录制范围全部是 Compose 内容，
- * 与 KSU 本尊（MainActivity.kt L388 layerBackdrop 挂法）同构，玻璃全开。
+ *
+ * About 弹出逻辑：
+ *   - 仅当本次冷启动是"第 4n 次打开"时，用户滑动页面会触发弹窗；
+ *   - 进程存活期间最多弹一次（弹过后滑动不再触发）；
+ *   - 清后台重开进程后重新计数（计数持久化，跨进程累计）。
  */
 @Composable
 fun CampusGlassHost(
@@ -45,15 +57,24 @@ fun CampusGlassHost(
 ) {
     CampusMiuixTheme {
         val context = LocalContext.current
-        val aboutAllowed = remember { LaunchGate.isAboutLaunch(context) }
+        // remember {} 不带 key：进程存活期间只求值一次，转场/重组不会重复读
+        val aboutArmed = remember { LaunchGate.isAboutLaunch(context) }
         var showAbout by remember { mutableStateOf(false) }
         var aboutShownThisProcess by remember { mutableStateOf(false) }
 
         DemoGlassPage(
             selectedPageId = selectedPageId,
             onPageSelected = onPageSelected,
+            // 滑动触发（DemoGlassPage 在用户滚动时回调）
+            onUserScroll = {
+                if (aboutArmed && !aboutShownThisProcess) {
+                    aboutShownThisProcess = true
+                    showAbout = true
+                }
+            },
+            // 长按底栏保留为手动入口，同样受闸门限制
             onLongPressBar = {
-                if (aboutAllowed && !aboutShownThisProcess) {
+                if (aboutArmed && !aboutShownThisProcess) {
                     aboutShownThisProcess = true
                     showAbout = true
                 }
