@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
-        webView = createWebView().also { it.loadUrl("https://zhy2026.ltd") }
+        webView = createWebView() // 注意：不在这里 loadUrl —— 布局前加载会让站点 JS 拿到 0 尺寸
 
         setContent {
             CampusGlassHost(
@@ -78,31 +78,23 @@ class MainActivity : ComponentActivity() {
             textZoom = 100
         }
 
-        // 诊断探针：页面加载完打印 Chromium 内部视口信息
+        // 诊断探针：页面加载完打印布局信息（发布版可移除）
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
                 android.util.Log.w("WVPROBE", "console: ${consoleMessage.message()}")
                 return true
             }
         }
-        wv.webViewClient = object : android.webkit.WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String) {
-                view.evaluateJavascript(
-                    """(function(){
-                    var out=[];
-                    document.querySelectorAll('*').forEach(function(e){
-                      var s=getComputedStyle(e);
-                      if((s.overflowY==='auto'||s.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+10){
-                        out.push(e.tagName+'.'+(e.className&&e.className.toString().slice(0,40))+' ch='+e.clientHeight+' sh='+e.scrollHeight);
-                      }
-                    });
-                    var kids=Array.from(document.body.children).slice(0,10).map(function(e){
-                      var r=e.getBoundingClientRect();
-                      return e.tagName+'.'+(e.className&&e.className.toString().slice(0,40))+' top='+Math.round(r.top)+' h='+Math.round(r.height);
-                    });
-                    return JSON.stringify({bodyCH:document.body.clientHeight,bodySH:document.body.scrollHeight,kids:kids,scrollers:out.slice(0,8)});
-                    })()""",
-                ) { v -> android.util.Log.w("WVPROBE", "deep: $v") }
+
+        // 关键修复：等 WebView 完成首次布局（尺寸>0）后再加载站点。
+        // 之前在 onCreate 立即 loadUrl，站点 JS 计算视口高度时
+        // WebView 尺寸还是 0，导致 .page-view 容器全部塌陷
+        // （实测 body.clientHeight=0、page-view 高 144px），页面"只有一小条"。
+        var loaded = false
+        wv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (!loaded && wv.width > 0 && wv.height > 0) {
+                loaded = true
+                wv.loadUrl("https://zhy2026.ltd")
             }
         }
         return wv
