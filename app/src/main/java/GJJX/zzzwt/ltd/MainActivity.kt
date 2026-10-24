@@ -116,9 +116,22 @@ class MainActivity : ComponentActivity() {
                 super.onReceivedHttpError(view, request, errorResponse)
                 if (!request.isForMainFrame) return
                 val code = errorResponse.statusCode
-                // 403/503 常见于 Cloudflare 拦截
-                if (code >= 400) {
-                    showErrorPage(view, code, "HTTP $code")
+                // 5xx：Cloudflare 隧道/源站故障（1033/522/530 等）
+                // 4xx：一般是权限或路径问题
+                if (code >= 500 || code == 404) {
+                    // 延迟一点再判定：给 WebView 渲染错误页的机会，
+                    // 避免把能正常显示的页面（如带自定义 404 页）误覆盖
+                    view.postDelayed({
+                        view.evaluateJavascript(
+                            "(function(){return document.body && document.body.innerText.trim().length;})()"
+                        ) { len ->
+                            val n = len?.trim('"')?.toIntOrNull() ?: 0
+                            // 页面几乎没文字 → 认为不可用，显示友好错误页
+                            if (n < 20) {
+                                showErrorPage(view, code, "HTTP $code")
+                            }
+                        }
+                    }, 600L)
                 }
             }
         }
@@ -162,13 +175,18 @@ class MainActivity : ComponentActivity() {
         }
         val html = """
             <!DOCTYPE html><html><head><meta charset="utf-8">
-            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
             <style>
-              html,body{height:100%;margin:0;padding:0}
+              /* 三重兜底：100vh + 100% + min-height，避免 WebView 里高度塌陷 */
+              html{height:100vh !important;min-height:100vh !important;margin:0;padding:0}
+              body{height:100vh !important;min-height:100vh !important;margin:0;padding:0;
+                   box-sizing:border-box}
               body{display:flex;align-items:center;justify-content:center;
-                   font-family:-apple-system,"Segoe UI",sans-serif;background:#f4f7fb;color:#16324f}
+                   font-family:-apple-system,"Segoe UI",sans-serif;
+                   background:#f4f7fb;color:#16324f;
+                   -webkit-text-size-adjust:100%}
               .box{text-align:center;padding:32px 28px;max-width:360px}
-              .icon{font-size:48px;margin-bottom:16px}
+              .icon{font-size:48px;margin-bottom:16px;line-height:1}
               h2{margin:0 0 10px;font-size:19px;font-weight:600}
               p{margin:0 0 22px;font-size:14px;color:#6b7a90;line-height:1.6}
               button{padding:11px 28px;font-size:15px;color:#fff;background:#1a5fb4;
