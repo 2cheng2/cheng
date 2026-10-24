@@ -1,6 +1,5 @@
 package GJJX.zzzwt.ltd.compose
 
-import android.view.MotionEvent
 import android.webkit.WebView
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +75,25 @@ fun CampusSitePage(
         CAMPUS_ITEMS.indexOfFirst { it.id == selectedPageId }.coerceAtLeast(0)
     }
 
+    // 滑动检测：监听 WebView 自身的滚动位置变化（不劫持触摸事件）。
+    // 之前用 setOnTouchListener 拦截 ACTION_MOVE，会干扰 WebView 的手势识别，
+    // 表现为"下滑之后划不回去"。改成读 onScrollChanged 完全无侵入。
+    DisposableEffect(webView) {
+        val listener = object : android.view.View.OnScrollChangeListener {
+            override fun onScrollChange(
+                v: android.view.View,
+                scrollX: Int,
+                scrollY: Int,
+                oldScrollX: Int,
+                oldScrollY: Int,
+            ) {
+                if (scrollY != oldScrollY) onUserScroll()
+            }
+        }
+        webView.setOnScrollChangeListener(listener)
+        onDispose { webView.setOnScrollChangeListener(null as android.view.View.OnScrollChangeListener?) }
+    }
+
     Box(Modifier.fillMaxSize()) {
         // ==== 录制范围：只有曲线背景（纯 Compose）====
         // 实测结论（2026-10-24）：WebView 不能进 layerBackdrop 录制范围——
@@ -94,15 +113,7 @@ fun CampusSitePage(
         AndroidView(
             factory = { webView },
             modifier = Modifier.fillMaxSize(),
-            update = { wv ->
-                // WebView 手指拖动视为"滑动"（About 闸门触发源）
-                wv.setOnTouchListener { _, event ->
-                    if (event.action == MotionEvent.ACTION_MOVE) {
-                        onUserScroll()
-                    }
-                    false // 不消费，WebView 正常滚动
-                }
-            },
+            update = { },
         )
 
         // ==== KSU BottomBarMiuix 浮动底栏（必须在录制范围外！）====

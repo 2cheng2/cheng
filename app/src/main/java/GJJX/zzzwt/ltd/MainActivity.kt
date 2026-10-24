@@ -61,7 +61,9 @@ class MainActivity : ComponentActivity() {
     private fun createWebView(): WebView {
         val wv = WebView(this)
         wv.setBackgroundColor(Color.WHITE)
-        wv.setOverScrollMode(View.OVER_SCROLL_NEVER)
+        // 不能用 OVER_SCROLL_NEVER：它会让 WebView 在到达边缘后
+        // 无法正确回弹/反向滚动（表现为"下滑后划不回去"）。
+        wv.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS)
         wv.setLayerType(View.LAYER_TYPE_NONE, null)
 
         wv.settings.apply {
@@ -81,8 +83,42 @@ class MainActivity : ComponentActivity() {
 
         wv.webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
-                if (url.contains("zhy2026.ltd")) {
-                    view.evaluateJavascript(FIX_LAYOUT_JS, null)
+                if (!url.contains("zhy2026.ltd")) return
+                // 只在站点真正的页面生效：
+                // Cloudflare 错误页（1033/522 等）结构完全不同，
+                // 强制 flex + overflow:hidden 会把它改白屏，必须跳过。
+                // 站点页面的判定依据：存在 .page-view 元素。
+                view.evaluateJavascript(
+                    "(function(){return !!document.querySelector('.page-view');})()"
+                ) { hasPageView ->
+                    if (hasPageView == "true") {
+                        view.evaluateJavascript(FIX_LAYOUT_JS, null)
+                    }
+                }
+            }
+
+            override fun onReceivedError(
+                view: WebView,
+                request: android.webkit.WebResourceRequest,
+                error: android.webkit.WebResourceError,
+            ) {
+                super.onReceivedError(view, request, error)
+                // 只在主框架失败时提示（子资源失败不影响页面）
+                if (!request.isForMainFrame) return
+                showErrorPage(view, error.errorCode, error.description?.toString() ?: "")
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView,
+                request: android.webkit.WebResourceRequest,
+                errorResponse: android.webkit.WebResourceResponse,
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (!request.isForMainFrame) return
+                val code = errorResponse.statusCode
+                // 403/503 常见于 Cloudflare 拦截
+                if (code >= 400) {
+                    showErrorPage(view, code, "HTTP $code")
                 }
             }
         }
@@ -112,6 +148,42 @@ class MainActivity : ComponentActivity() {
         webView?.destroy()
         webView = null
         super.onDestroy()
+    }
+
+    /** 主框架加载失败时显示可读的错误页，避免白屏无提示 */
+    private fun showErrorPage(view: WebView, code: Int, desc: String) {
+        val reason = when (code) {
+            -2 -> "网络连接已断开"
+            -6 -> "无法连接到服务器"
+            -8, -9 -> "连接超时"
+            522, 523, 524 -> "源服务器无响应（$code）"
+            1033 -> "Cloudflare 隧道未启动（1033）"
+            else -> desc.ifBlank { "错误码 $code" }
+        }
+        val html = """
+            <!DOCTYPE html><html><head><meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <style>
+              html,body{height:100%;margin:0;padding:0}
+              body{display:flex;align-items:center;justify-content:center;
+                   font-family:-apple-system,"Segoe UI",sans-serif;background:#f4f7fb;color:#16324f}
+              .box{text-align:center;padding:32px 28px;max-width:360px}
+              .icon{font-size:48px;margin-bottom:16px}
+              h2{margin:0 0 10px;font-size:19px;font-weight:600}
+              p{margin:0 0 22px;font-size:14px;color:#6b7a90;line-height:1.6}
+              button{padding:11px 28px;font-size:15px;color:#fff;background:#1a5fb4;
+                     border:none;border-radius:10px;font-weight:600;
+                     box-shadow:0 4px 12px rgba(26,95,180,.25)}
+              button:active{transform:scale(.97)}
+            </style></head><body>
+            <div class="box">
+              <div class="icon">📡</div>
+              <h2>暂时连不上校园服务</h2>
+              <p>${reason}<br>请检查网络，或稍后再试。</p>
+              <button onclick="location.replace('https://zhy2026.ltd')">重新加载</button>
+            </div></body></html>
+        """.trimIndent()
+        view.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
     }
 
     companion object {
