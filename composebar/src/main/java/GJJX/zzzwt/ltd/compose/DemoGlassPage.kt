@@ -43,6 +43,17 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 无 WebView —— backdrop 录制的是纯 Compose 内容，与 KSU 本尊同构，
  * 玻璃管线（blur + vibrancy + lens 折射）可全量开启。
  */
+
+data class BarItem(val id: String, val label: String)
+
+val CAMPUS_ITEMS = listOf(
+    BarItem("home", "首页"),
+    BarItem("tools", "助手"),
+    BarItem("forum", "论坛"),
+    BarItem("gallery", "相册"),
+    BarItem("scores", "数据"),
+)
+
 @Composable
 fun DemoGlassPage(
     selectedPageId: String,
