@@ -1,6 +1,10 @@
 package GJJX.zzzwt.ltd
 
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
+import android.view.View
+import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -11,30 +15,78 @@ import GJJX.zzzwt.ltd.compose.CampusGlassHost
 import GJJX.zzzwt.ltd.compose.LaunchGate
 
 /**
- * 校园服务 —— 液态玻璃演示模式（Android 9 ~ 15，minSdk 28）。
+ * 校园服务最终版 —— WebView 站点（zhy2026.ltd）+ KSU 液态玻璃底栏。
  *
- * 当前阶段：纯 Compose 演示页（KSU 液态玻璃底栏 + 曲线背景）。
- * WebView 站点壳暂缓接入：miuix-blur 的 layerBackdrop 录制范围
- * 不能包含 AndroidView（ViewLayer 会被重复挂进渲染树，
- * RenderThread prepareTreeImpl 无限递归 → SIGSEGV，2026-10-24 实测）。
+ * 架构要点（2026-10-24 全链路实测结论）：
+ *   1. WebView 由 Compose AndroidView 独占挂载（child already has a parent）。
+ *   2. 绝不给 WebView 设 LAYER_TYPE_HARDWARE（ViewLayer 会干扰 backdrop 录制）。
+ *   3. 底栏必须在 layerBackdrop 录制范围外（自录成环 → RenderThread SIGSEGV）。
+ *   4. 底栏切页通过 evaluateJavascript 调站点自身的 switchPage(pageId)。
  */
 class MainActivity : ComponentActivity() {
 
     private var selectedPage by mutableStateOf("home")
 
+    private var webView: WebView? = null
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 冷启动计数（About 每 4 次冷启动可弹一次的闸门）
+
+        // 冷启动计数（About 弹出闸门：第 1、3、5… 次打开武装）
         if (savedInstanceState == null) {
             LaunchGate.onNewLaunch(this)
         }
+
         enableEdgeToEdge()
+
+        webView = createWebView().also { it.loadUrl("https://zhy2026.ltd") }
+
         setContent {
             CampusGlassHost(
+                webView = webView!!,
                 selectedPageId = selectedPage,
-                onPageSelected = { selectedPage = it },
-                blurEnabled = true,
+                onPageSelected = { pageId ->
+                    selectedPage = pageId
+                    webView?.evaluateJavascript(
+                        "try{switchPage('$pageId')}catch(e){console.warn(e)}", null)
+                },
             )
         }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun createWebView(): WebView {
+        val wv = WebView(this)
+        wv.setBackgroundColor(Color.TRANSPARENT)
+        wv.setOverScrollMode(View.OVER_SCROLL_NEVER)
+        wv.setLayerType(View.LAYER_TYPE_NONE, null) // 见类注释 2
+
+        wv.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            mediaPlaybackRequiresUserGesture = false
+            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            userAgentString = userAgentString?.replace("; wv", "")?.replace(" Version/4.0", "")
+        }
+        return wv
+    }
+
+    override fun onPause() {
+        super.onPause()
+        webView?.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView?.onResume()
+    }
+
+    override fun onDestroy() {
+        webView?.destroy()
+        webView = null
+        super.onDestroy()
     }
 }
