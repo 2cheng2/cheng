@@ -28,7 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,13 +78,13 @@ fun DemoGlassPage(
         CAMPUS_ITEMS.indexOfFirst { it.id == selectedPageId }.coerceAtLeast(0)
     }
 
-    // 用户滑动手势检测：任何拖动滚动都触发一次回调（含对滚动位移和 fling）
+    // 用户滑动手势检测：任何拖动滚动都触发一次回调（含滚动位移和 fling）
     val scrollConnection = remember(onUserScroll) {
-        object : androidx.compose.ui.input.pointer.NestedScrollConnection {
+        object : NestedScrollConnection {
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
-                source: androidx.compose.ui.input.pointer.NestedScrollSource,
+                source: NestedScrollSource,
             ): Offset {
                 if (consumed.y != 0f || available.y != 0f) onUserScroll()
                 return Offset.Zero
