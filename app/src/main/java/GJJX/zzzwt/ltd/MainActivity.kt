@@ -119,17 +119,25 @@ class MainActivity : ComponentActivity() {
                 // 5xx：Cloudflare 隧道/源站故障（1033/522/530 等）
                 // 4xx：一般是权限或路径问题
                 if (code >= 500 || code == 404) {
-                    // 延迟一点再判定：给 WebView 渲染错误页的机会，
-                    // 避免把能正常显示的页面（如带自定义 404 页）误覆盖
+                    // 延迟判定：识别 Cloudflare 错误页特征
+                    // （CF 错误页会返回 5xx 但带着自己的错误页面，样式简陋）
                     view.postDelayed({
                         view.evaluateJavascript(
-                            "(function(){return document.body && document.body.innerText.trim().length;})()"
-                        ) { len ->
-                            val n = len?.trim('"')?.toIntOrNull() ?: 0
-                            // 页面几乎没文字 → 认为不可用，显示友好错误页
-                            if (n < 20) {
-                                showErrorPage(view, code, "HTTP $code")
-                            }
+                            """(function(){
+                              var t = (document.body && document.body.innerText || '').toLowerCase();
+                              var isCf = t.indexOf('cloudflare') >= 0
+                                      || t.indexOf('error 1033') >= 0
+                                      || t.indexOf('error 530') >= 0
+                                      || t.indexOf('error 522') >= 0
+                                      || t.indexOf('error 1016') >= 0
+                                      || t.indexOf('bad gateway') >= 0
+                                      || t.indexOf('origin is unreachable') >= 0;
+                              return isCf ? 'cf' : 'other';
+                            })()"""
+                        ) { kind ->
+                            // CF 错误页 → 用我们自己的友好页接管（间距/居中更规整）
+                            // 其他 5xx → 同样接管；非错误页保持原样
+                            showErrorPage(view, code, "HTTP $code")
                         }
                     }, 600L)
                 }
@@ -177,14 +185,11 @@ class MainActivity : ComponentActivity() {
             <!DOCTYPE html><html><head><meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
             <style>
-              /* 三重兜底：100vh + 100% + min-height，避免 WebView 里高度塌陷 */
-              html{height:100vh !important;min-height:100vh !important;margin:0;padding:0}
-              body{height:100vh !important;min-height:100vh !important;margin:0;padding:0;
-                   box-sizing:border-box}
-              body{display:flex;align-items:center;justify-content:center;
+              html,body{margin:0;padding:0;width:100%;height:100%}
+              html{height:100vh}
+              body{height:100vh;display:flex;align-items:center;justify-content:center;
                    font-family:-apple-system,"Segoe UI",sans-serif;
-                   background:#f4f7fb;color:#16324f;
-                   -webkit-text-size-adjust:100%}
+                   background:#f4f7fb;color:#16324f;-webkit-text-size-adjust:100%}
               .box{text-align:center;padding:32px 28px;max-width:360px}
               .icon{font-size:48px;margin-bottom:16px;line-height:1}
               h2{margin:0 0 10px;font-size:19px;font-weight:600}
@@ -199,9 +204,21 @@ class MainActivity : ComponentActivity() {
               <h2>暂时连不上校园服务</h2>
               <p>${reason}<br>请检查网络，或稍后再试。</p>
               <button onclick="location.replace('https://zhy2026.ltd')">重新加载</button>
-            </div></body></html>
+            </div>
+            <script>
+              /* 兜底：某些 WebView 下 100vh 解析不准，用真实 innerHeight 钉死 */
+              (function fix(){
+                var h = window.innerHeight;
+                if (!h || h < 200) { setTimeout(fix, 50); return; }
+                document.documentElement.style.height = h + 'px';
+                document.body.style.height = h + 'px';
+              })();
+            </script>
+            </body></html>
         """.trimIndent()
-        view.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+        // baseUrl 必须给真实域名：传 null 会让页面运行在 about:blank 下，
+        // 视口高度与 CSS vh 单位计算异常，导致 flex 居中失效、内容挤在顶部。
+        view.loadDataWithBaseURL("https://zhy2026.ltd/", html, "text/html", "utf-8", null)
     }
 
     companion object {
