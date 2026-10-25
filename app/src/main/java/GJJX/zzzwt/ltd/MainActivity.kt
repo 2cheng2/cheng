@@ -254,7 +254,8 @@ class MainActivity : ComponentActivity() {
                 document.head.appendChild(s);
               }
               s.textContent = [
-                /* 1. 用百分比高度替代 dvh（body 选择器 + 媒体查询同款，靠 id 样式表后加载取胜） */
+                /* 1. 高度：优先用 JS 实测像素（错误页已验证这种方式在 WebView 里最可靠），
+                      100%/100dvh 作为回退 */
                 'html { height: 100% !important; }',
                 'html body, body { height: 100% !important; min-height: 0 !important; display: flex !important; flex-direction: column !important; overflow: hidden !important; }',
                 /* 2. flex 子项允许收缩 + 内层滚动（关键：min-height:0） */
@@ -263,6 +264,30 @@ class MainActivity : ComponentActivity() {
                 /* 3. 站点自己的底部导航不显示（双保险，非 app-mode 下本已 display:none） */
                 'html body .app-bottom-nav, .app-bottom-nav { display: none !important; }'
               ].join('\n');
+
+              /* 4. 像素兜底：错误页用 window.innerHeight 钉死高度才成功居中全屏，
+                    站点同样处理——直接给 html/body 赋实测像素高度，
+                    绕开 WebView 对 vh/dvh 单位的解析问题。 */
+              (function pinHeight(){
+                var h = window.innerHeight;
+                if (!h || h < 200) { setTimeout(pinHeight, 50); return; }
+                document.documentElement.style.setProperty('height', h + 'px', 'important');
+                document.body.style.setProperty('height', h + 'px', 'important');
+                document.body.style.setProperty('min-height', h + 'px', 'important');
+              })();
+
+              /* 5. 窗口尺寸变化（旋转/键盘弹出/切页后布局重算）时重新钉高度 */
+              if (!window.__zhyPinBound) {
+                window.__zhyPinBound = true;
+                var repin = function(){
+                  var h = window.innerHeight;
+                  if (!h || h < 200) return;
+                  document.documentElement.style.setProperty('height', h + 'px', 'important');
+                  document.body.style.setProperty('height', h + 'px', 'important');
+                };
+                window.addEventListener('resize', repin);
+                window.addEventListener('orientationchange', function(){ setTimeout(repin, 300); });
+              }
 
               // 滚回顶部，避免残留滚动位置
               var av = document.querySelector('.page-view.active');

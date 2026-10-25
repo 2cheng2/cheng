@@ -71,6 +71,12 @@ fun CampusSitePage(
         drawContent()
     }
 
+    // 玻璃的内容源：曲线背景（纯 Compose，无延迟、无割裂）
+    // 说明：曾尝试用 PixelCopy 抓 WebView 画面做 backdrop 以实现「透视网页」，
+    // 但抓帧是逐帧异步的，滚动时玻璃会滞后、割裂，观感比纯色更差，故放弃。
+    // WebView 是独立 ViewLayer，无法像 KSU 那样被 layerBackdrop 直接录制
+    // （会 RenderNode 成环 → SIGSEGV），所以玻璃模糊曲线背景是当前稳定解。
+
     val selectedIndex = remember(selectedPageId) {
         CAMPUS_ITEMS.indexOfFirst { it.id == selectedPageId }.coerceAtLeast(0)
     }
