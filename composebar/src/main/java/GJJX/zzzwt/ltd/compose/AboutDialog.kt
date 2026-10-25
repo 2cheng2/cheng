@@ -50,7 +50,13 @@ fun AboutDialog(
                     color = Color(0xFF6B7A90),
                 )
                 Text(
-                    "\n底栏效果来自 KernelSU / miuix 项目 (Apache 2.0)",
+                    "\n底栏效果基于 KernelSU / miuix 开源项目（Apache 2.0），" +
+                        "自行搭建编译环境并重构框架，费时费力",
+                    fontSize = 11.sp,
+                    color = Color(0xFF6B7A90),
+                )
+                Text(
+                    "有 bug 请找论坛内的管理员 chengxing53 反馈",
                     fontSize = 11.sp,
                     color = Color(0xFF6B7A90),
                 )
