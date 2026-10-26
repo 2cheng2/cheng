@@ -71,8 +71,9 @@ fun CampusGlassHost(
             onPageSelected = onPageSelected,
             // 滑动不再触发 About（避免打扰），保留参数以兼容调用方
             onUserScroll = { },
-            // 长按底栏 = 手动查看作者信息（随时可看）
-            onLongPressBar = { showAbout = true },
+            // 长按底栏不再显示作者信息：作者信息只在「每两次打开」时自动弹一次，
+            // 这是唯一入口，避免用户随手长按就弹出来。
+            onLongPressBar = { },
         )
 
         if (showAbout) {

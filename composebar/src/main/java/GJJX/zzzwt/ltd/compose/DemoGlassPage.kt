@@ -128,11 +128,6 @@ fun CampusSitePage(
         FloatingBottomBar(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onLongPress = { onLongPressBar() },
-                    )
-                }
                 .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
             selectedIndex = selectedIndex,
             onSelected = { index -> onPageSelected(CAMPUS_ITEMS[index].id) },
