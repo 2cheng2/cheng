@@ -57,11 +57,24 @@ fun CampusGlassHost(
         var showAbout by remember { mutableStateOf(false) }
         var aboutShownThisProcess by remember { mutableStateOf(false) }
 
+        // 远程通知（服务器下发的公告，不更新 App 也能弹）
+        var notice by remember { mutableStateOf<RemoteNotice.Notice?>(null) }
+
         // 进入即判定：命中闸门就自动弹出（强制展示，不依赖滑动/长按）
         LaunchedEffect(Unit) {
             if (!aboutShownThisProcess && LaunchGate.isAboutLaunch(context)) {
                 aboutShownThisProcess = true
                 showAbout = true
+            }
+        }
+
+        // 拉取远程通知：有新的就弹（同一条只弹一次）
+        LaunchedEffect(Unit) {
+            val versionCode = runCatching {
+                context.packageManager.getPackageInfo(context.packageName, 0).versionCode
+            }.getOrDefault(0)
+            RemoteNotice.check(context, versionCode) { n ->
+                notice = n
             }
         }
 
@@ -78,6 +91,15 @@ fun CampusGlassHost(
 
         if (showAbout) {
             AboutDialog(onDismiss = { showAbout = false })
+        }
+
+        // 远程通知弹窗
+        notice?.let { n ->
+            NoticeDialog(
+                title = n.title,
+                message = n.message,
+                onDismiss = { notice = null },
+            )
         }
     }
 }
