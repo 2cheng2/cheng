@@ -9,27 +9,38 @@ import java.util.concurrent.Executors
 /**
  * 远程通知。
  *
- * 设计要点：**不依赖 zhy2026.ltd**。
- * 校园服务站点经常关停维护，若通知源跟着站点走，站点一挂公告就发不出去。
- * 所以通知源走独立地址，并支持多源回退 + 本地缓存：
+ * 设计要点：**通知源完全独立于 zhy2026.ltd 站点**。
+ * 站点由第三方维护、经常关停，通知能力是 App 自身功能，
+ * 不能跟着站点一起挂掉。
  *
- *   1. 依次尝试多个通知源（任一可用即可）
- *   2. 成功拉到的内容写入本地缓存
- *   3. 全部失败时——用缓存里上次成功的通知（仍能补发未读公告）
+ * 通知源：GitHub（本仓库）
+ *   优先用 GitHub API 拉取 release 的 body 作为公告，
+ *   这样发布通知 = 在 GitHub 上发一个 release，不用动服务器。
  *
- * 通知源（按顺序尝试，任一成功即返回）：
- *   - https://zhy2026.ltd/app-notice.json     主源（自建域名）
- *   - 备用源见 ALT_URLS，可自行替换为任意静态托管
+ *   拉取顺序：
+ *     1. https://api.github.com/repos/2cheng2/cheng/releases/latest
+ *        （读 body 字段，格式见下）
+ *     2. 本地缓存（网络不通时用上次成功的内容）
  *
- * JSON 格式：
- * {
- *   "id": "2026-10-27-1",       // 唯一 id，同 id 只弹一次
- *   "title": "重要通知",
- *   "message": "服务器将于…",
- *   "enabled": true,            // false 时不下发
- *   "minVersionCode": 0,        // 可选，低于此版本不弹
- *   "maxVersionCode": 0         // 可选，0 = 不限
- * }
+ * 公告格式（写在 release 的说明里，前几行用 JSON）：
+ * ┌────────────────────────────────────┐
+ * │ {"id":"2026-10-27-1",              │
+ * │  "title":"重要通知",                │
+ * │  "message":"服务器维护中…"}          │
+ * │                                    │
+ * │ （下面是正常的 release 说明，可写别的）│
+ * └────────────────────────────────────┘
+ *
+ * 兼容纯 JSON 文件形式，所以也支持：
+ *   https://raw.githubusercontent.com/2cheng2/cheng/main/app-notice.json
+ *
+ * 字段：
+ *   id            唯一 id，同 id 只弹一次（必填）
+ *   title         弹窗标题（可选，默认「通知」）
+ *   message       弹窗正文（必填）
+ *   enabled       false 时不下发（可选）
+ *   minVersionCode 低于此 versionCode 不弹（可选）
+ *   maxVersionCode 高于此 versionCode 不弹，0=不限（可选）
  */
 object RemoteNotice {
 
@@ -37,12 +48,18 @@ object RemoteNotice {
     private const val KEY_LAST_SEEN = "last_seen_id"
     private const val KEY_CACHE = "notice_cache"
 
-    /** 通知源，按优先级尝试。任一可用即可，不依赖站点是否在线。 */
+    /** GitHub 仓库（当前项目仓库） */
+    private const val REPO = "2cheng2/cheng"
+
+    /**
+     * 通知源，按顺序尝试，任一成功即可。
+     * 全部与 zhy2026.ltd 无关。
+     */
     private val SOURCES = listOf(
-        // 主源：自建域名下的静态文件
-        "https://zhy2026.ltd/app-notice.json",
-        // 备用源：换成你自己的任意静态托管地址即可
-        // 例如 GitHub Pages / Gitee / 对象存储 等，和站点完全独立
+        // 1) GitHub Release 说明（发通知 = 发一个 release）
+        "https://api.github.com/repos/$REPO/releases/latest",
+        // 2) 仓库里的纯 JSON 文件（备用，改文件即可）
+        "https://raw.githubusercontent.com/$REPO/main/app-notice.json",
     )
 
     private val pool = Executors.newSingleThreadExecutor()
@@ -51,32 +68,29 @@ object RemoteNotice {
 
     /**
      * 异步拉取通知。有未读通知时回调 onNotice（主线程）。
-     * 网络失败时回退到本地缓存，保证站点关闭期间也能补发公告。
+     * 网络失败时回退到本地缓存。
      */
     fun check(context: Context, versionCode: Int, onNotice: (Notice) -> Unit) {
         val appContext = context.applicationContext
         pool.execute {
             val sp = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-            // 依次尝试各通知源，第一个成功的就用它
-            var json: String? = null
+            var payload: String? = null
             for (src in SOURCES) {
-                json = fetch(src)
-                if (!json.isNullOrBlank()) break
+                payload = fetchNoticeJson(src)
+                if (!payload.isNullOrBlank()) break
             }
 
-            if (!json.isNullOrBlank()) {
-                // 拉取成功：写入缓存，供网络不通时回退使用
-                sp.edit().putString(KEY_CACHE, json).apply()
+            if (!payload.isNullOrBlank()) {
+                sp.edit().putString(KEY_CACHE, payload).apply()
             } else {
-                // 全部失败：回退到上次缓存的公告（站点关闭时也能提示）
-                json = sp.getString(KEY_CACHE, null)
+                payload = sp.getString(KEY_CACHE, null)
             }
 
-            if (json.isNullOrBlank()) return@execute
+            if (payload.isNullOrBlank()) return@execute
 
             try {
-                val obj = JSONObject(json)
+                val obj = JSONObject(payload)
                 if (!obj.optBoolean("enabled", true)) return@execute
 
                 val minV = obj.optInt("minVersionCode", 0)
@@ -89,7 +103,6 @@ object RemoteNotice {
                 val message = obj.optString("message")
                 if (message.isBlank()) return@execute
 
-                // 同一条通知只弹一次
                 if (sp.getString(KEY_LAST_SEEN, null) == id) return@execute
                 sp.edit().putString(KEY_LAST_SEEN, id).apply()
 
@@ -102,14 +115,83 @@ object RemoteNotice {
         }
     }
 
-    private fun fetch(url: String): String? {
+    /**
+     * 从某个源取出公告 JSON 字符串。
+     * 兼容两种响应：
+     *   - GitHub Release 对象 → 从 body 字段里抽出开头的 JSON 对象
+     *   - 纯 JSON 文件 → 直接使用
+     */
+    private fun fetchNoticeJson(url: String): String? {
+        val text = httpGet(url) ?: return null
+        if (text.isBlank()) return null
+
+        val trimmed = text.trimStart()
+
+        // 纯 JSON 文件：整体就是公告对象
+        if (trimmed.startsWith("{")) {
+            // 但 GitHub Release 对象也是 {，需要区分：
+            // release 对象含 "body" 字段，且不会有 "message" 里的业务内容
+            return try {
+                val obj = JSONObject(trimmed)
+                if (obj.has("tag_name") || obj.has("html_url")) {
+                    // 是 release 对象 → 取其 body
+                    extractFromText(obj.optString("body"))
+                } else {
+                    trimmed
+                }
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
+        return extractFromText(text)
+    }
+
+    /**
+     * 从任意文本中抽出开头的 JSON 对象（release 说明可能带其他内容）。
+     */
+    private fun extractFromText(text: String?): String? {
+        if (text.isNullOrBlank()) return null
+        val start = text.indexOf('{')
+        if (start < 0) return null
+
+        // 花括号配对，找到完整的 JSON 对象
+        var depth = 0
+        var inStr = false
+        var esc = false
+        for (i in start until text.length) {
+            val c = text[i]
+            if (inStr) {
+                when {
+                    esc -> esc = false
+                    c == '\\' -> esc = true
+                    c == '"' -> inStr = false
+                }
+            } else {
+                when (c) {
+                    '"' -> inStr = true
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) return text.substring(start, i + 1)
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun httpGet(url: String): String? {
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5000
-                readTimeout = 5000
+                connectTimeout = 6000
+                readTimeout = 6000
                 requestMethod = "GET"
                 setRequestProperty("Cache-Control", "no-cache")
+                // GitHub API 要求 UA，不设会被 403
+                setRequestProperty("User-Agent", "CampusServiceApp")
+                setRequestProperty("Accept", "application/vnd.github+json")
             }
             if (conn.responseCode != 200) return null
             conn.inputStream.bufferedReader().use { it.readText() }
