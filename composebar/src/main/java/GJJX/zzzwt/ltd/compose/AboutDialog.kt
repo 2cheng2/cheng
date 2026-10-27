@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 关于对话框 —— 作者署名。
- * 由底栏长按任意标签触发（见 CampusGlassHost 的手势层）。
+ * 关于对话框 —— 作者署名与著作权声明。
+ * 由启动闸门触发（每两次打开自动弹出一次）。
  */
 @Composable
 fun AboutDialog(
@@ -59,6 +59,13 @@ fun AboutDialog(
                     "有 bug 请找论坛内的管理员 chengxing53 反馈",
                     fontSize = 11.sp,
                     color = Color(0xFF6B7A90),
+                )
+                Text(
+                    "\n本应用为 GJX 独立开发，著作权归作者所有。" +
+                        "未经授权，禁止反编译、二次打包与商业分发。",
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    color = Color(0xFF8A94A6),
                 )
             }
         },
