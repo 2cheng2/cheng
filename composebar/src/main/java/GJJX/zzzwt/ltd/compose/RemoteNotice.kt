@@ -60,13 +60,15 @@ object RemoteNotice {
      *  - 多个镜像轮询，任一可用即可，抗单点故障。
      */
     private val SOURCES = listOf(
-        // 1) gitproxy 镜像（实测国内可达 200）
+        // 1) GitHub API contents 接口（实测可用、内容实时、不依赖第三方镜像）
+        "https://api.github.com/repos/$REPO/contents/app-notice.json",
+        // 2) gitproxy 镜像（实测国内可达；已加时间戳参数绕开其缓存）
         "https://api.gitproxy.dev/https://raw.githubusercontent.com/$REPO/main/app-notice.json",
-        // 2) GitHub API release（发了 release 时可用，api.github.com 国内一般可达）
+        // 3) GitHub API release（发了 release 时可用）
         "https://api.github.com/repos/$REPO/releases/latest",
-        // 3) 备用镜像：ghproxy 系列（不同线路，抗单点）
+        // 4) 备用镜像：ghproxy 系列（不同线路，抗单点）
         "https://mirror.ghproxy.com/https://raw.githubusercontent.com/$REPO/main/app-notice.json",
-        // 4) 原始地址放最后（海外可用，国内失败也不影响前面成功的情况）
+        // 5) 原始地址放最后（海外可用，国内失败也不影响前面成功的情况）
         "https://raw.githubusercontent.com/$REPO/main/app-notice.json",
     )
 
@@ -192,11 +194,19 @@ object RemoteNotice {
     private fun httpGet(url: String): String? {
         var conn: HttpURLConnection? = null
         return try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            // 追加时间戳参数绕开反向代理/CDN 缓存。
+            // 实测：gitproxy 这类镜像会缓存 raw 内容且无视 Cache-Control，
+            // 导致改完 app-notice.json 后 App 仍拿到旧公告。
+            // 加唯一查询参数后每次都是新请求，镜像无法命中缓存。
+            val bust = if (url.contains('?')) "&_t=" else "?_t="
+            val finalUrl = url + bust + System.currentTimeMillis()
+
+            conn = (URL(finalUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 6000
                 readTimeout = 6000
                 requestMethod = "GET"
-                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("Cache-Control", "no-cache, no-store")
+                setRequestProperty("Pragma", "no-cache")
                 // GitHub API 要求 UA，不设会被 403
                 setRequestProperty("User-Agent", "CampusServiceApp")
                 setRequestProperty("Accept", "application/vnd.github+json")
