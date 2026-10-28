@@ -7,11 +7,26 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/**
+ * 读取本应用真实版本号（来自 build.gradle 的 versionName），
+ * 避免在 UI 里硬编码版本号导致升级后忘记同步。
+ */
+@Composable
+private fun appVersionName(): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "1.0.0"
+    }
+}
 
 /**
  * 关于对话框 —— 作者署名与著作权声明。
@@ -20,7 +35,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun AboutDialog(
     onDismiss: () -> Unit,
-    versionName: String = "1.0.2",
+    versionName: String = appVersionName(),
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
