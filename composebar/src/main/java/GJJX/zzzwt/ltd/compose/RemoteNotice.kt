@@ -53,19 +53,20 @@ object RemoteNotice {
 
     /**
      * 通知源，按顺序尝试，任一成功即可。
-     * 全部与 zhy2026.ltd 站点是否在线无关。
      *
-     * 重要：raw.githubusercontent.com 在国内被墙（实测 HTTP 000），
-     * 不能作为源。改用 gitproxy 镜像 + 自家站点兜底。
+     * 说明：
+     *  - 全部走 GitHub，不依赖任何第三方站点（zhy2026.ltd 属站主，不能用）。
+     *  - raw.githubusercontent.com 在国内被墙（实测 HTTP 000），必须走镜像。
+     *  - 多个镜像轮询，任一可用即可，抗单点故障。
      */
     private val SOURCES = listOf(
-        // 1) GitHub 镜像（国内可达，实测 200）
+        // 1) gitproxy 镜像（实测国内可达 200）
         "https://api.gitproxy.dev/https://raw.githubusercontent.com/$REPO/main/app-notice.json",
-        // 2) GitHub API release（有发 release 时可用）
+        // 2) GitHub API release（发了 release 时可用，api.github.com 国内一般可达）
         "https://api.github.com/repos/$REPO/releases/latest",
-        // 3) 自家站点静态文件（若站主放了 app-notice.json 也可用）
-        "https://zhy2026.ltd/app-notice.json",
-        // 4) raw 源放最后（海外可访问，国内大概率失败但不影响前面成功的情况）
+        // 3) 备用镜像：ghproxy 系列（不同线路，抗单点）
+        "https://mirror.ghproxy.com/https://raw.githubusercontent.com/$REPO/main/app-notice.json",
+        // 4) 原始地址放最后（海外可用，国内失败也不影响前面成功的情况）
         "https://raw.githubusercontent.com/$REPO/main/app-notice.json",
     )
 
