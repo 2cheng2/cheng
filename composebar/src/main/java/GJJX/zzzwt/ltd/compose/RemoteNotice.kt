@@ -127,34 +127,42 @@ object RemoteNotice {
 
     /**
      * 从某个源取出公告 JSON 字符串。
-     * 兼容两种响应：
-     *   - GitHub Release 对象 → 从 body 字段里抽出开头的 JSON 对象
-     *   - 纯 JSON 文件 → 直接使用
+     * 兼容三种响应：
+     *   1. GitHub contents API —— 返回的是 {content: "base64...", encoding: "base64"}
+     *      需要先解 base64 才能拿到真正的 JSON（这是最容易踩的坑）
+     *   2. GitHub Release 对象 —— 取其 body 字段，再从文本里抽 JSON
+     *   3. 纯 JSON 文件 —— 直接使用
      */
     private fun fetchNoticeJson(url: String): String? {
         val text = httpGet(url) ?: return null
         if (text.isBlank()) return null
 
         val trimmed = text.trimStart()
+        if (!trimmed.startsWith("{")) return extractFromText(text)
 
-        // 纯 JSON 文件：整体就是公告对象
-        if (trimmed.startsWith("{")) {
-            // 但 GitHub Release 对象也是 {，需要区分：
-            // release 对象含 "body" 字段，且不会有 "message" 里的业务内容
-            return try {
-                val obj = JSONObject(trimmed)
-                if (obj.has("tag_name") || obj.has("html_url")) {
-                    // 是 release 对象 → 取其 body
-                    extractFromText(obj.optString("body"))
-                } else {
-                    trimmed
-                }
-            } catch (_: Throwable) {
-                null
+        return try {
+            val obj = JSONObject(trimmed)
+
+            // 1) GitHub contents API：content 是 base64，需解码
+            if (obj.optString("encoding") == "base64" && obj.has("content")) {
+                val b64 = obj.optString("content").replace("\n", "").replace("\r", "")
+                val decoded = String(
+                    android.util.Base64.decode(b64, android.util.Base64.DEFAULT),
+                    Charsets.UTF_8,
+                )
+                return extractFromText(decoded) ?: decoded.trim()
             }
-        }
 
-        return extractFromText(text)
+            // 2) GitHub Release 对象：含 tag_name / html_url，取 body
+            if (obj.has("tag_name") || obj.has("html_url")) {
+                return extractFromText(obj.optString("body"))
+            }
+
+            // 3) 纯公告 JSON
+            trimmed
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     /**
