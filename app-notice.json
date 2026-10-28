@@ -1,7 +1,7 @@
 {
-  "id": "test-2026-10-29-1",
-  "title": "测试",
-  "message": "测试",
+  "id": "test-2026-10-29-2",
+  "title": "测试公告",
+  "message": "如果你看到这条消息，说明远程公告功能已经正常工作了。\n\n这条公告是在你没有更新、没有重装 App 的情况下推送过来的。",
   "enabled": true,
   "minVersionCode": 0,
   "maxVersionCode": 0
